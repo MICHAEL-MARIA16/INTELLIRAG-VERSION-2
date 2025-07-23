@@ -84,18 +84,14 @@ htmlcov/
 sync_config.json
 
 # Logs
-logs/
 *.log
 
 # Data
-data/
 *.db
 *.sqlite
 *.sqlite3
 
 # Credentials & secrets
-credentials/
-credentials.json
 secrets/
 *.pem
 *.key
