@@ -1,0 +1,95 @@
+# --- PYTHON -----------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.dylib
+.Python
+*.egg-info/
+dist/
+build/
+
+# --- VIRTUAL ENVIRONMENTS --------------------------------
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# --- ENVIRONMENT & SECRETS -------------------------------
+.env
+.env.*
+.python-version
+Pipfile.lock
+poetry.lock
+
+# --- CREDENTIALS ------------------------------------------
+credentials/
+credentials.json
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.pub
+sync_config.json
+
+# --- OS / IDE FILES ---------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# --- LOGGING & CACHE --------------------------------------
+logs/
+*.log
+.cache/
+cache/
+.mypy_cache/
+.pytype/
+
+# --- TEMP & BACKUP FILES ----------------------------------
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# --- TESTING & COVERAGE -----------------------------------
+tests/
+.pytest_cache/
+.coverage
+.coverage.*
+*.cover
+*.py,cover
+htmlcov/
+.tox/
+.nox/
+
+# --- JUPYTER ----------------------------------------------
+.ipynb_checkpoints
+
+# --- NODE / FRONTEND --------------------------------------
+node_modules/
+
+# --- DATABASES --------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+
+# --- LOCAL DEV ARTIFACTS ---------------------------------
+local_*
+dev_*
+
+# --- GIT (optional but good if image is exported) ---------
+.gitmodules
+.gitattributes

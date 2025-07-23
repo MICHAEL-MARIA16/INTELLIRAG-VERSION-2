@@ -1,0 +1,146 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.7.3
+    container_name: rag_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "true"]  # Or switch to curl format if curl installed
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - rag_network
+
+  rag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.flask
+    container_name: rag_api
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - app_cache:/app/cache
+    environment: &common-env
+      - PORT=5000
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - COLLECTION_NAME=documents
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - CHUNK_SIZE=500
+      - CHUNK_OVERLAP=50
+      - SYNC_INTERVAL=3600
+      - LOG_LEVEL=INFO
+      - LOG_FILE=/app/logs/rag_app.log
+      - DEBUG=false
+      - HF_HOME=/app/cache/huggingface
+      - QDRANT_API_KEY=${QDRANT_API_KEY}  # Replace or use .env
+      - GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID}  # Replace or use .env
+      - QDRANT_COLLECTION=documents  # Same as COLLECTION_NAME, for compatibility
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+    command: ["python", "api.py"]
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - rag_network
+
+  rag-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.react
+    container_name: rag_ui
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://rag-api:5000  # optional: use container name instead of localhost
+    depends_on:
+      - rag-api
+    restart: unless-stopped
+    profiles:
+      - ui
+    networks:
+      - rag_network
+
+  rag-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag_sync
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - app_cache:/app/cache
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_URL=http://qdrant:6333
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - COLLECTION_NAME=documents
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - CHUNK_SIZE=500
+      - CHUNK_OVERLAP=50
+      - SYNC_INTERVAL=3600
+      - LOG_LEVEL=INFO
+      - LOG_FILE=/app/logs/rag_sync.log
+      - DEBUG=false
+      - HF_HOME=/app/cache/huggingface
+      - QDRANT_API_KEY=${QDRANT_API_KEY}  # Replace or use .env
+      - GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID}  # Replace or use .env
+      - QDRANT_COLLECTION=documents  # Same as COLLECTION_NAME, for compatibility
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+    command: ["python", "sync_scheduler.py"]
+    networks:
+      - rag_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: rag_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - rag-api
+    restart: unless-stopped
+    profiles:
+      - production
+    networks:
+      - rag_network
+
+volumes:
+  qdrant_data:
+    driver: local
+  app_cache:
+    driver: local
+
+networks:
+  rag_network:
+    driver: bridge
+
+

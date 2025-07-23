@@ -1,0 +1,143 @@
+# Git
+.gitignore
+.gitmodules
+.gitattributes
+
+# Docker
+.dockerignore
+docker-compose*.yml
+
+# Documentation
+README.md
+docs/
+*.md
+
+# OS and Editor files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+
+# IDE settings
+.vscode/
+.idea/
+
+# Python cache and build
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.dll
+*.dylib
+*.lib
+*.a
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python tooling
+.python-version
+Pipfile
+Pipfile.lock
+poetry.lock
+poetry.toml
+requirements-dev.txt
+
+# Type-checking and test tools
+.mypy_cache/
+.pyre/
+.pytype/
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+
+# Environment files
+.env
+.env.*
+sync_config.json
+
+# Logs
+logs/
+*.log
+
+# Data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Credentials & secrets
+credentials/
+credentials.json
+secrets/
+*.pem
+*.key
+*.crt
+*.pub
+*.p12
+*.pfx
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Cache
+cache/
+.cache/
+
+# Local dev files
+local_*
+dev_*
+
+# Backup files
+*.bak
+*.backup
+
+# Node
+node_modules/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Testing files
+tests/
+test_*
+*_test.py
+
+# Hooks and CI
+.hooks/
+.pre-commit-config.yaml
+# Frontend (React/Vite) build artifacts and dev files
+frontend/node_modules/
+frontend/.env
+frontend/.env.*
+frontend/.vite/
+frontend/dist/
