@@ -54,3 +54,4 @@ loguru==0.7.2
 
 gunicorn
 flask
+flask-cors
