@@ -79,21 +79,41 @@ def health():
 def ask():
     """Main query endpoint"""
     if not chatbot:
-        return jsonify({"error": "Chatbot not initialized"}), 500
+        return jsonify({
+            "answer": {
+                "text": "⚠️ Chatbot not initialized.",
+                "sources": []
+            },
+            "query": None,
+            "status": "error"
+        }), 500
 
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"error": "No JSON data provided"}), 400
+            return jsonify({
+                "answer": {
+                    "text": "⚠️ No JSON data provided.",
+                    "sources": []
+                },
+                "query": None,
+                "status": "error"
+            }), 400
 
         query = data.get("query", "").strip()
         if not query:
-            return jsonify({"error": "Query is required"}), 400
+            return jsonify({
+                "answer": {
+                    "text": "⚠️ Query is required.",
+                    "sources": []
+                },
+                "query": None,
+                "status": "error"
+            }), 400
 
         logger.info(f"Processing query: {query[:50]}...")
         result = chatbot.chat(query)
 
-        # Extract just file names from sources
         source_names = [s.get("file_name", "Unknown") for s in result.get("sources", [])]
 
         return jsonify({
@@ -106,8 +126,15 @@ def ask():
         })
 
     except Exception as e:
-        logger.error(f"Error processing query: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.exception("Error processing query")
+        return jsonify({
+            "answer": {
+                "text": "⚠️ Internal server error. Please try again later.",
+                "sources": []
+            },
+            "query": None,
+            "status": "error"
+        }), 500
 
 
 @app.route('/api/stats', methods=['GET'])

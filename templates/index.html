@@ -581,7 +581,7 @@
         logOutput.textContent = `✅ System Status: ${data.status || 'ready'}\n📊 Documents: ${data.total_documents || 0}\n📁 Files: ${data.total_files || 0}\n⏰ Updated: ${new Date().toLocaleString()}`;
       } catch (err) {
         headerStatus.textContent = "Connection Error";
-        logOutput.textContent = `loading .... Couldn’t reach the server. Please wait a moment or try refreshing."}`;
+        logOutput.textContent = `loading .... Couldn’t reach the server. Please wait a moment or try refreshing.`;
         console.error("Fetch stats error:", err);
       }
   }
