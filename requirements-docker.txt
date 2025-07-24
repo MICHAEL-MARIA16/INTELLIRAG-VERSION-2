@@ -55,3 +55,8 @@ loguru==0.7.2
 gunicorn
 flask
 flask-cors
+google-generativeai
+python-dotenv
+sentence-transformers
+qdrant-client
+numpy

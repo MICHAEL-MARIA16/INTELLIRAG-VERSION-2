@@ -58,3 +58,8 @@ langchain-community
 flask
 gunicorn
 flask-cors
+google-generativeai
+python-dotenv
+sentence-transformers
+qdrant-client
+numpy
