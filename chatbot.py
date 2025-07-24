@@ -451,7 +451,7 @@ def chat():
             return jsonify({'error': 'Query cannot be empty'}), 400
         
         result = chatbot.chat(query)
-        return jsonify(result)
+        return jsonify({"answer": result})
     
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
