@@ -151,10 +151,10 @@ class DriveQdrantSync:
                 if len(drive_files) > 5:
                     logger.info(f"  ... and {len(drive_files) - 5} more files")
                 
-                # TEMPORARY: Process only first 2 files for testing
+                
                 original_count = len(drive_files)
-                drive_files = drive_files[:2]
-                logger.info(f"🧪 TESTING MODE: Processing only first {len(drive_files)} files (out of {original_count})")
+                #drive_files = drive_files[:2]
+                logger.info(f" Processing all {original_count} files from Google Drive")
                 
                 drive_file_ids = {file['id'] for file in drive_files}
                 

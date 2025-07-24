@@ -5,7 +5,7 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime
 import hashlib
 import csv
-
+import hashlib
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
@@ -74,6 +74,11 @@ class GoogleDriveLoader:
             logger.error(f"Error fetching files: {error}")
             return []
     
+    def get_file_hash(self, file_info: dict) -> str:
+        unique_str = f"{file_info['id']}_{file_info.get('modifiedTime', '')}_{file_info.get('size', '')}"
+        return hashlib.sha256(unique_str.encode('utf-8')).hexdigest()
+
+
     def download_file_content(self, file_id: str, mime_type: str) -> Optional[bytes]:
         """Download file content from Google Drive"""
         try:
@@ -316,24 +321,40 @@ class GoogleDriveLoader:
         return hashlib.md5(file_data.encode()).hexdigest()
     
     def process_all_files(self) -> List[Dict[str, Any]]:
-        """Process all files in the folder and return document chunks with metadata"""
         files = self.get_files_in_folder()
         processed_documents = []
-        
+        current_ids = set()
+
         for file_info in files:
+            file_id = file_info['id']
+            file_hash = self.get_file_hash(file_info)
+            current_ids.add(file_id)
+
+            # Check Qdrant to see if file already exists with same hash
+            existing = self.qdrant.search(
+                query_vector=[0.0]*768,  # dummy vector, we only use filter
+                collection_name=self.qdrant.collection_name,
+                limit=1,
+                with_payload=True,
+                query_filter={"must": [{"key": "file_id", "match": {"value": file_id}}]}
+            )
+
+            if existing and existing[0].payload.get("file_hash") == file_hash:
+                print(f"Skipping unchanged file: {file_info['name']}")
+                continue
+
             try:
                 text = self.extract_text_from_file(file_info)
                 if not text:
                     continue
-                
+
                 chunks = self.chunk_text(text)
                 embeddings = self.generate_embeddings(chunks)
-                file_hash = self.get_file_hash(file_info)
-                
+
                 for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                     doc = {
-                        'id': f"{file_info['id']}_{i}",
-                        'file_id': file_info['id'],
+                        'id': f"{file_id}_{i}",
+                        'file_id': file_id,
                         'file_name': file_info['name'],
                         'file_hash': file_hash,
                         'chunk_index': i,
@@ -349,11 +370,24 @@ class GoogleDriveLoader:
                         }
                     }
                     processed_documents.append(doc)
-                    
-                logger.info(f"Processed {file_info['name']}: {len(chunks)} chunks")
-                
+
+                print(f"Processed file: {file_info['name']}")
+
             except Exception as e:
-                logger.error(f"Error processing file {file_info['name']}: {e}")
-                continue
-        
+                print(f"Error processing {file_info['name']}: {e}")
+
+        # 🔥 Optional: remove deleted files (if you want full sync)
+        self.remove_deleted_files(current_ids)
+
         return processed_documents
+    def remove_deleted_files(self, current_ids: set):
+        """Delete chunks of files removed from Drive"""
+        stored = self.qdrant.scroll(self.qdrant.collection_name)
+        all_file_ids = {point.payload['file_id'] for point in stored if 'file_id' in point.payload}
+        removed_ids = all_file_ids - current_ids
+
+        for file_id in removed_ids:
+            self.qdrant.delete_by_filter(self.qdrant.collection_name, {
+                "must": [{"key": "file_id", "match": {"value": file_id}}]
+            })
+            print(f"Deleted vectors for removed file: {file_id}")

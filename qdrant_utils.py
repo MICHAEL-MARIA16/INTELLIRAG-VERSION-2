@@ -287,7 +287,7 @@ class QdrantManager:
             # Try filter-based deletion first (requires index)
             result = self.client.delete(
                 collection_name=self.collection_name,
-                points_filter=Filter(
+                points_selector=Filter(
                     must=[
                         FieldCondition(
                             key="file_id",
