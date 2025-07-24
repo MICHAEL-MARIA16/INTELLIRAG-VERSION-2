@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 from threading import Lock
-
+from flask import Flask
 # Set environment variable before importing chatbot
 os.environ["TRANSFORMERS_NO_ADDITIONAL_MODULES"] = "1"
 
