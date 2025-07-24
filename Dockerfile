@@ -53,4 +53,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/health || exit 1
 
 # Default command
+ENV TRANSFORMERS_CACHE=/tmp/hf_cache
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "api:app"]

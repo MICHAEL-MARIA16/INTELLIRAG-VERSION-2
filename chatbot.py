@@ -581,4 +581,13 @@ def main():
 
 
 if __name__ == '__main__':
-    exit(main())
+    import sys
+    if len(sys.argv) == 1:
+        # No arguments passed — default to API mode for Railway
+        os.environ["FLASK_RUN_FROM_CLI"] = "false"
+        if not initialize_chatbot():
+            logger.error("Failed to initialize chatbot for API mode")
+            exit(1)
+        app.run(host='0.0.0.0', port=int(os.getenv("PORT", 5000)))
+    else:
+        exit(main())
