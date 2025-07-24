@@ -560,20 +560,32 @@
     const sendBtn = document.getElementById("sendBtn");
 
     async function fetchStats() {
-      try {
-        const res = await fetch("/api/stats");
-        const data = await res.json();
+  try {
+    const res = await fetch("/api/stats");
 
-        totalChunks.textContent = data.total_documents || 0;
-        totalFiles.textContent = data.total_files || 0;
-        headerStatus.textContent = `${data.status?.toUpperCase() || 'READY'} • Last sync: ${new Date().toLocaleTimeString()}`;
-        
-        logOutput.textContent = `✅ System Status: ${data.status || 'ready'}\n📊 Documents: ${data.total_documents || 0}\n📁 Files: ${data.total_files || 0}\n⏰ Updated: ${new Date().toLocaleString()}`;
-      } catch (err) {
-        headerStatus.textContent = "Connection Error";
-        logOutput.textContent = "❌ Failed to fetch system status.\nPlease check your connection.";
-      }
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
     }
+
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Response is not JSON");
+    }
+
+    const data = await res.json();
+
+    totalChunks.textContent = data.total_documents || 0;
+    totalFiles.textContent = data.total_files || 0;
+    headerStatus.textContent = `${data.status?.toUpperCase() || 'READY'} • Last sync: ${new Date().toLocaleTimeString()}`;
+
+    logOutput.textContent = `✅ System Status: ${data.status || 'ready'}\n📊 Documents: ${data.total_documents || 0}\n📁 Files: ${data.total_files || 0}\n⏰ Updated: ${new Date().toLocaleString()}`;
+  } catch (err) {
+    headerStatus.textContent = "Connection Error";
+    logOutput.textContent = `❌ Failed to fetch system status.\n${err.message || "Please check your connection."}`;
+    console.error("Fetch stats error:", err);
+  }
+}
+
 
     async function triggerSync() {
       syncBtn.disabled = true;

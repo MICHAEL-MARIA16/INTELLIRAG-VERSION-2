@@ -19,7 +19,7 @@ load_dotenv()
 
 # Initialize Flask app (only once!)
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:5000", "http://localhost:5000"])
+CORS(app, origins=["*"])  # or better: your frontend’s actual domain
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
