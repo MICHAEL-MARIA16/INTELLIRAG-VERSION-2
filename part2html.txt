@@ -125,18 +125,6 @@
       color: #2f855a;
     }
 
-    .status-indicator.syncing {
-      background: rgba(237, 137, 54, 0.1);
-      border-color: rgba(237, 137, 54, 0.3);
-      color: #c05621;
-    }
-
-    .status-indicator.error {
-      background: rgba(245, 101, 101, 0.1);
-      border-color: rgba(245, 101, 101, 0.3);
-      color: #c53030;
-    }
-
     .status-dot {
       width: 8px;
       height: 8px;
@@ -145,24 +133,9 @@
       animation: pulse 2s infinite;
     }
 
-    .status-dot.syncing {
-      background: #ed8936;
-      animation: spin 1s infinite linear;
-    }
-
-    .status-dot.error {
-      background: #f56565;
-      animation: none;
-    }
-
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
-    }
-
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
     }
 
     /* Main Content */
@@ -227,10 +200,6 @@
       box-shadow: none;
     }
 
-    .sync-button.syncing {
-      background: linear-gradient(135deg, #ed8936, #dd6b20);
-    }
-
     .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -272,36 +241,6 @@
       max-height: 200px;
       overflow-y: auto;
       border: 1px solid #2d3748;
-    }
-
-    /* Progress bar */
-    .progress-container {
-      width: 100%;
-      height: 4px;
-      background: #e2e8f0;
-      border-radius: 2px;
-      margin-bottom: 1rem;
-      overflow: hidden;
-    }
-
-    .progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      border-radius: 2px;
-      transition: width 0.3s ease;
-      width: 0%;
-    }
-
-    .progress-bar.indeterminate {
-      background: linear-gradient(90deg, transparent, #667eea, transparent);
-      background-size: 200% 100%;
-      animation: progress-indeterminate 2s infinite;
-      width: 100%;
-    }
-
-    @keyframes progress-indeterminate {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
     }
 
     /* Chat Area */
@@ -540,8 +479,8 @@
           <div class="logo-icon">🧠</div>
           <span>INTELLIRAG GDRIVE AI</span>
         </div>
-        <div class="status-indicator" id="statusIndicator">
-          <div class="status-dot" id="statusDot"></div>
+        <div class="status-indicator">
+          <div class="status-dot"></div>
           <span id="headerStatus">System Ready</span>
         </div>
       </div>
@@ -556,12 +495,6 @@
             <span>🔄</span>
             Knowledge Sync
           </h3>
-          
-          <!-- Progress bar -->
-          <div class="progress-container" id="progressContainer" style="display: none;">
-            <div class="progress-bar" id="progressBar"></div>
-          </div>
-          
           <button class="sync-button" id="syncBtn">
             <span>⚡</span>
             Sync Documents
@@ -619,25 +552,12 @@
   <script>
     const syncBtn = document.getElementById("syncBtn");
     const headerStatus = document.getElementById("headerStatus");
-    const statusIndicator = document.getElementById("statusIndicator");
-    const statusDot = document.getElementById("statusDot");
     const totalChunks = document.getElementById("totalChunks");
     const totalFiles = document.getElementById("totalFiles");
     const logOutput = document.getElementById("logOutput");
-    const progressContainer = document.getElementById("progressContainer");
-    const progressBar = document.getElementById("progressBar");
     const chatMessages = document.getElementById("chatMessages");
     const userInput = document.getElementById("userInput");
     const sendBtn = document.getElementById("sendBtn");
-
-    let syncPollingInterval = null;
-    let isCurrentlySyncing = false;
-
-    function updateStatusIndicator(status, message) {
-      statusIndicator.className = `status-indicator ${status}`;
-      statusDot.className = `status-dot ${status}`;
-      headerStatus.textContent = message;
-    }
 
     async function fetchStats() {
       try {
@@ -656,89 +576,21 @@
 
         totalChunks.textContent = data.total_documents || 0;
         totalFiles.textContent = data.total_files || 0;
-        
-        if (!isCurrentlySyncing) {
-          updateStatusIndicator('', `${data.status?.toUpperCase() || 'READY'} • Last sync: ${new Date().toLocaleTimeString()}`);
-          logOutput.textContent = `✅ System Status: ${data.status || 'ready'}\n📊 Documents: ${data.total_documents || 0}\n📁 Files: ${data.total_files || 0}\n⏰ Updated: ${new Date().toLocaleString()}`;
-        }
+        headerStatus.textContent = `${data.status?.toUpperCase() || 'READY'} • Last sync: ${new Date().toLocaleTimeString()}`;
+
+        logOutput.textContent = `✅ System Status: ${data.status || 'ready'}\n📊 Documents: ${data.total_documents || 0}\n📁 Files: ${data.total_files || 0}\n⏰ Updated: ${new Date().toLocaleString()}`;
       } catch (err) {
-        if (!isCurrentlySyncing) {
-          updateStatusIndicator('error', "Connection Error");
-          logOutput.textContent = `❌ Couldn't reach the server. Please wait a moment or try refreshing.`;
-        }
+        headerStatus.textContent = "Connection Error";
+        logOutput.textContent = `loading .... Couldn’t reach the server. Please wait a moment or try refreshing.`;
         console.error("Fetch stats error:", err);
       }
-    }
+  }
 
-    async function pollSyncStatus() {
-      try {
-        const res = await fetch("/api/sync/status");
-        const status = await res.json();
-
-        if (status.running) {
-          // Still syncing
-          isCurrentlySyncing = true;
-          updateStatusIndicator('syncing', status.message || "Syncing...");
-          
-          // Show progress bar
-          progressContainer.style.display = 'block';
-          progressBar.className = 'progress-bar indeterminate';
-          
-          // Update log with current status
-          let logMessage = `🔄 ${status.message || 'Synchronization in progress...'}\n`;
-          if (status.details) {
-            logMessage += `\n📋 Details:\n${status.details}`;
-          }
-          logOutput.textContent = logMessage;
-          
-        } else {
-          // Sync completed or not running
-          isCurrentlySyncing = false;
-          clearInterval(syncPollingInterval);
-          syncPollingInterval = null;
-          
-          // Hide progress bar
-          progressContainer.style.display = 'none';
-          
-          // Re-enable sync button
-          syncBtn.disabled = false;
-          syncBtn.innerHTML = '<span>⚡</span>Sync Documents';
-          syncBtn.className = 'sync-button';
-          
-          if (status.success === true) {
-            updateStatusIndicator('', "Sync Completed Successfully");
-            logOutput.textContent = `✅ Sync completed successfully!\n\n${status.message || 'Knowledge base updated.'}\n\n📈 Processing complete at ${status.last_run_readable || new Date().toLocaleString()}`;
-          } else if (status.success === false) {
-            updateStatusIndicator('error', "Sync Failed");
-            logOutput.textContent = `❌ Sync failed: ${status.error || status.message || 'Unknown error'}\n\n🔧 Please check your configuration and try again.\n\n⏰ Failed at: ${status.last_run_readable || new Date().toLocaleString()}`;
-          }
-          
-          // Refresh stats after sync completion
-          setTimeout(fetchStats, 2000);
-        }
-      } catch (err) {
-        console.error("Error polling sync status:", err);
-        // Don't clear interval on network errors, keep trying
-      }
-    }
 
     async function triggerSync() {
-      if (isCurrentlySyncing) {
-        console.log("Sync already in progress");
-        return;
-      }
-
-      // Update UI immediately
-      isCurrentlySyncing = true;
       syncBtn.disabled = true;
-      syncBtn.innerHTML = '<span>🔄</span>Starting...';
-      syncBtn.className = 'sync-button syncing';
-      updateStatusIndicator('syncing', "Initiating Sync...");
-      
-      // Show progress bar
-      progressContainer.style.display = 'block';
-      progressBar.className = 'progress-bar indeterminate';
-      
+      syncBtn.innerHTML = '<span>🔄</span>Syncing...';
+      headerStatus.textContent = "Syncing Knowledge Base...";
       logOutput.textContent = "🚀 Initiating knowledge base synchronization...\n📡 Connecting to Google Drive...\n🔍 Scanning for document updates...";
 
       try {
@@ -746,34 +598,22 @@
         const result = await res.json();
 
         if (res.ok) {
-          // Start polling for status updates
-          syncPollingInterval = setInterval(pollSyncStatus, 2000); // Poll every 2 seconds
-          
-          // Initial status update
-          updateStatusIndicator('syncing', "Synchronization Started");
-          logOutput.textContent = `🚀 ${result.message || 'Synchronization started successfully'}\n\n⏳ This may take a few minutes depending on the number of documents...\n\n📊 Check the progress above.`;
+          logOutput.textContent = `✅ Sync completed successfully!\n\n${result.message || 'Knowledge base updated.'}\n\n📈 Processing complete at ${new Date().toLocaleString()}`;
+          headerStatus.textContent = "Sync Completed";
         } else {
-          // Sync failed to start
-          isCurrentlySyncing = false;
-          syncBtn.disabled = false;
-          syncBtn.innerHTML = '<span>⚡</span>Sync Documents';
-          syncBtn.className = 'sync-button';
-          progressContainer.style.display = 'none';
-          
-          updateStatusIndicator('error', "Failed to Start Sync");
-          logOutput.textContent = `❌ Failed to start sync: ${result.error || 'Unknown error'}\n\n🔧 Please check your configuration and try again.`;
+          logOutput.textContent = `❌ Sync failed: ${result.error || 'Unknown error'}\n\n🔧 Please check your configuration and try again.`;
+          headerStatus.textContent = "Sync Failed";
         }
       } catch (e) {
-        // Network error
-        isCurrentlySyncing = false;
+        logOutput.textContent = `❌ Connection error: ${e.message}\n\n🌐 Please check your internet connection.`;
+        headerStatus.textContent = "Connection Error";
+      }
+
+      setTimeout(() => {
         syncBtn.disabled = false;
         syncBtn.innerHTML = '<span>⚡</span>Sync Documents';
-        syncBtn.className = 'sync-button';
-        progressContainer.style.display = 'none';
-        
-        updateStatusIndicator('error', "Connection Error");
-        logOutput.textContent = `❌ Connection error: ${e.message}\n\n🌐 Please check your internet connection and try again.`;
-      }
+        fetchStats();
+      }, 3000);
     }
 
     function addMessage(content, isUser = false, isThinking = false) {
@@ -853,31 +693,8 @@
     // Initialize
     fetchStats();
     
-    // Auto-refresh stats every 30 seconds (but not during sync)
-    setInterval(() => {
-      if (!isCurrentlySyncing) {
-        fetchStats();
-      }
-    }, 30000);
-
-    // Check for any ongoing sync on page load
-    setTimeout(async () => {
-      try {
-        const res = await fetch("/api/sync/status");
-        const status = await res.json();
-        
-        if (status.running) {
-          // There's an ongoing sync, start polling
-          isCurrentlySyncing = true;
-          syncBtn.disabled = true;
-          syncBtn.innerHTML = '<span>🔄</span>Syncing...';
-          syncBtn.className = 'sync-button syncing';
-          syncPollingInterval = setInterval(pollSyncStatus, 2000);
-        }
-      } catch (err) {
-        console.error("Error checking initial sync status:", err);
-      }
-    }, 1000);
+    // Auto-refresh stats every 30 seconds
+    setInterval(fetchStats, 30000);
   </script>
 </body>
 </html>
