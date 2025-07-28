@@ -878,6 +878,23 @@
         console.error("Error checking initial sync status:", err);
       }
     }, 1000);
+    document.getElementById("syncBtn").addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/sync", {
+          method: "POST"
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          alert("✅ Sync started: " + data.message);
+        } else {
+          alert("⚠️ Sync failed: " + (data.error || "Unknown error"));
+        }
+      } catch (err) {
+        alert("❌ Error triggering sync: " + err.message);
+      }
+    });
   </script>
 </body>
 </html>
