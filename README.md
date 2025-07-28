@@ -1,168 +1,206 @@
-# 🤖 IntelliRAG — AI-Powered Chatbot with Google Drive & Gemini-1.5-flash ✨
+# IntelliRAG - AI-Powered Document Assistant
 
-A fully **Dockerized** and **Flask-based Retrieval-Augmented Generation (RAG)** chatbot, seamlessly integrating **Google Gemini Pro**, **Qdrant vector database**, and **Google Drive** for intelligent document retrieval.
+A production-ready Retrieval-Augmented Generation (RAG) chatbot that intelligently searches and answers questions from your Google Drive documents using Google Gemini-1.5-flash and Qdrant vector database.
 
-> 📡 **Live Demo:** [Visit IntelliRAG Chatbot Here](https://intellirag-gdrive-bot16.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Demo-Live-brightgreen)](https://intellirag-gdrive-bot16.onrender.com)
+[![Docker](https://img.shields.io/badge/Docker-Supported-blue)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
----
+## Overview
 
-## 🧠 What IntelliRAG Does
+IntelliRAG transforms how you interact with your document collections by providing AI-powered search and question-answering capabilities. Simply connect your Google Drive, sync your documents, and start asking questions to get contextual, accurate answers.
 
-IntelliRAG revolutionizes how you interact with your documents. It's designed to provide precise, AI-generated answers by leveraging your Google Drive content.
+> 🚀 **Live App Available at:**  
+> 🌐 [https://intellirag-gdrive-bot16.onrender.com](https://intellirag-gdrive-bot16.onrender.com)
 
-* **🔍 Intelligent Query Processing:** Accepts user queries via a sleek web chat interface.
-* **📄 Contextual Retrieval:** Retrieves highly relevant information from your **Google Drive** documents using advanced **Qdrant vector search**.
-* **🧠 High-Quality Answer Generation:** Feeds the retrieved context to the powerful **Google Gemini-1.5-flash** LLM to synthesize accurate and comprehensive answers.
-* **🔄 Effortless Document Sync:** Syncs your Google Drive documents with a **single click** – no manual uploads required!
-* **🌐 Seamless Deployment:** Fully deployable via **Docker** on platforms like **Render** or any other cloud service.
+### Key Capabilities
 
----
+- **Intelligent Document Search**: Advanced vector search through your Google Drive documents
+- **AI-Powered Responses**: Contextual answers generated using Google Gemini-1.5-flash
+- **One-Click Synchronization**: Seamless document syncing from Google Drive to vector database
+- **Production Ready**: Fully containerized with Docker and optimized for cloud deployment
+- **Real-time Processing**: Instant document indexing and query processing
 
-## ⚙️ Technologies Under the Hood
+## Architecture
 
-IntelliRAG is built with a robust and modern tech stack, ensuring performance, scalability, and ease of use.
+### Technology Stack
 
-| Component         | Tech Stack                                                                    |
-| :---------------- | :---------------------------------------------------------------------------- |
-| **Backend** | Flask (REST API)                                                              |
-| **LLM Integration** | Google Gemini-1.5-flash (via Gemini API)                                            |
-| **Vector DB** | Qdrant (via Qdrant Cloud API for efficient vector search)                     |
-| **Document Loader** | Google Drive API, Langchain, & Unstructured (for diverse document parsing)    |
-| **Embedding Model** | `sentence-transformers/paraphrase-MiniLM-L6-v2` (for high-quality embeddings) |
-| **Frontend** | HTML, CSS, JavaScript (for an intuitive user interface)                       |
-| **Containerization** | Docker (for consistent and isolated environments)                             |
-| **Hosting** | Render (for automated and scalable deployments)                               |
+| Component | Technology |
+|-----------|------------|
+| **Backend Framework** | Flask (Python) |
+| **Language Model** | Google Gemini-1.5-flash |
+| **Vector Database** | Qdrant Cloud |
+| **Document Processing** | LangChain + Unstructured |
+| **Embeddings** | Sentence Transformers (paraphrase-MiniLM-L6-v2) |
+| **Frontend** | HTML5, CSS3, JavaScript |
+| **Containerization** | Docker |
+| **Deployment** | Render (configurable for other platforms) |
 
----
+### System Flow
 
-## 🚀 Get Started: Deploy on Render (Fully Automated)
+1. **Document Ingestion**: Google Drive documents are automatically processed and chunked
+2. **Vector Embedding**: Text chunks are converted to high-dimensional vectors using sentence transformers
+3. **Storage**: Vectors are stored in Qdrant with metadata for efficient retrieval
+4. **Query Processing**: User queries are embedded and matched against the vector database
+5. **Response Generation**: Retrieved context is sent to Gemini-1.5-flash for answer synthesis
 
-Deploying IntelliRAG on Render is incredibly straightforward. Follow these steps to get your chatbot up and running in minutes!
+## Quick Start
 
-1.  **Fork this repository** to your GitHub account.
-2.  **Add your secrets** (refer to the `.env` section below for details).
-3.  Navigate to [Render](https://render.com/) and click on **"New Web Service."**
-4.  Connect your forked repository.
-5.  Configure the following settings for your new web service:
-    * **Runtime**: `Docker`
-    * **Start Command**:
-        ```bash
-        gunicorn --bind 0.0.0.0:5000 api:app
-        ```
-    * **Environment**: `Python 3.11`
-6.  Render will automatically build and deploy your application. Once deployment is complete, visit your live link and start chatting!
+### Cloud Deployment (Recommended)
 
----
+1. **Fork this repository** to your GitHub account
 
-## 🔐 Environment Variables (.env or Render Secrets)
+2. **Set up your environment variables** (see Configuration section below)
 
-Securely configure your application with the following environment variables. On Render, you can add these in the "Environment" tab of your Web Service settings.
+3. **Deploy on Render**:
+   - Visit [Render](https://render.com/) and create a new Web Service
+   - Connect your forked repository
+   - Configure deployment settings:
+     ```
+     Runtime: Docker
+     Start Command: gunicorn --bind 0.0.0.0:5000 api:app
+     Environment: Python 3.11
+     ```
 
-| Key                      | Description                                                  |
-| :----------------------- | :----------------------------------------------------------- |
-| `GOOGLE_DRIVE_TOKEN`     | OAuth token for secure access to your Google Drive.          |
-| `QDRANT_API_KEY`         | API key for authenticating with your Qdrant cloud instance. |
-| `QDRANT_URL`             | The endpoint URL for your Qdrant vector database.            |
-| `GEMINI_API_KEY`         | Your API key for accessing the Google Gemini Pro LLM.        |
-| `COLLECTION_NAME`        | The chosen name for your Qdrant collection.                  |
+4. **Access your deployment** at the provided Render URL
 
----
-
-## 🧪 Local Development Setup
-
-For local development and testing, follow these steps:
+### Local Development
 
 ```bash
 # Clone the repository
-git clone [https://github.com/MICHAEL-MARIA16/INTELLIRAG-GDRIVE_BOT.git](https://github.com/MICHAEL-MARIA16/INTELLIRAG-GDRIVE_BOT.git)
+git clone https://github.com/MICHAEL-MARIA16/INTELLIRAG-GDRIVE_BOT.git
 cd intellirag
 
-# Create a Python virtual environment
+# Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install project dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# Run the Flask API locally
+# Set environment variables (create .env file)
+# See Configuration section for required variables
+
+# Run the application
 python api.py
+```
 
-Visit http://localhost:5000 in your browser to test the application.
+Visit `http://localhost:5000` to access the application.
 
-## 📦 Docker Support
-
-You can also leverage Docker for a consistent local development experience:
+### Docker Deployment
 
 ```bash
-# Build the Docker image
+# Build the image
 docker build -t intellirag .
 
-# Run the Docker container, mapping port 5000
-docker run -p 5000:5000 intellirag
+# Run the container
+docker run -p 5000:5000 --env-file .env intellirag
+```
 
-📁 File Structure Overview
-Understanding the project's layout will help you navigate and contribute:
+## Configuration
 
+Create a `.env` file or set the following environment variables:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GOOGLE_DRIVE_TOKEN` | OAuth2 token for Google Drive API access | Yes |
+| `QDRANT_API_KEY` | Authentication key for Qdrant Cloud | Yes |
+| `QDRANT_URL` | Qdrant instance endpoint URL | Yes |
+| `GEMINI_API_KEY` | Google Gemini API authentication key | Yes |
+| `COLLECTION_NAME` | Name for your Qdrant collection | Yes |
+
+### Obtaining API Keys
+
+1. **Google Drive Token**: Follow [Google Drive API documentation](https://developers.google.com/drive/api/quickstart/python)
+2. **Qdrant**: Create account at [Qdrant Cloud](https://cloud.qdrant.io/)
+3. **Gemini API**: Get key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+
+## Project Structure
+
+```
 INTELLIRAG/
-├── api.py                  # Main Flask API routes and application entry point
-├── chatbot.py              # Core RAG chatbot logic and LLM interaction
-├── sync.py                 # Handles Google Drive to Qdrant document synchronization
-├── drive_loader.py         # Google Drive API integration for document loading
-├── qdrant_utils.py         # Qdrant client connection, embedding, and search utilities
-├── templates/index.html    # Frontend HTML template for the chat interface
-├── static/                 # Contains CSS, JavaScript, and other static assets
-├── requirements.txt        # Lists all Python dependencies
-├── Dockerfile              # Defines the Docker image build process
-└── README.md               # You are here! 🎉
-📌 Key Features
-IntelliRAG comes packed with powerful features designed for efficiency and intelligence:
+├── api.py              # Flask application and REST API endpoints
+├── chatbot.py          # Core RAG logic and LLM integration
+├── sync.py             # Google Drive synchronization handler
+├── drive_loader.py     # Google Drive API client and document loader
+├── qdrant_utils.py     # Vector database operations and utilities
+├── templates/
+│   └── index.html      # Web interface template
+├── static/             # CSS, JavaScript, and static assets
+├── requirements.txt    # Python dependencies
+├── Dockerfile          # Container configuration
+└── README.md          # Documentation
+```
 
-✅ Plug-and-play Integration: Seamlessly combines Qdrant, Gemini, and Google Drive.
+## Usage
 
-✅ One-Click Document Sync: Simplifies keeping your vector database up-to-date.
+### Document Synchronization
 
-✅ Production-Ready Dockerfile: Ensures consistent deployment across environments.
+1. Access the web interface
+2. Click the "Sync Documents" button
+3. Wait for synchronization to complete
+4. Documents are now searchable through the chat interface
 
-✅ Gunicorn for Performance: Optimized for high-concurrency Flask serving.
+### Querying Documents
 
-✅ Render-Compatible Deployment: Streamlined for automated cloud hosting.
+- Type your question in the chat interface
+- The system will search relevant document chunks
+- AI-generated responses will include contextual information from your documents
 
-✅ Modular & Extensible Architecture: Easy to understand, modify, and expand.
+## Features
 
-📸 Screenshots
+- **Automated Document Processing**: Supports multiple file formats (PDF, DOCX, TXT, etc.)
+- **Semantic Search**: Advanced vector similarity search for accurate document retrieval
+- **Context-Aware Responses**: AI responses include relevant document excerpts
+- **Real-time Sync**: Keep your knowledge base updated with latest document changes
+- **Scalable Architecture**: Designed for high-concurrency usage
+- **Cloud-Native**: Optimized for modern cloud deployment platforms
 
-**🔹 Chatbot UI**
+## 📸 Screenshots
+
+Here are some UI previews of the IntelliRAG chatbot in action:
+
+### 🔹 Chatbot Interface
 ![Chatbot UI](static/chatbot-ui.png)
 
-**🔹 Real-Time Google Drive Sync**
+### 🔹 Real-Time Google Drive Sync
 ![Real-Time Sync](static/real-time-sync-update.png)
 
-**🔹 Sync Status Confirmation**
+### 🔹 Sync Status Indicator
 ![Sync Status](static/sync-status.png)
 
-📍 Deployment URL
-Your live IntelliRAG chatbot is accessible here:
 
-🔗 https://intellirag-gdrive-bot16.onrender.com
+## Contributing
 
-💡 Future Enhancements
-We're always looking to improve IntelliRAG! Here are some exciting ideas for future development:
+We welcome contributions! Please follow these steps:
 
-🔒 Add Authentication & User Tracking: Implement secure user login and monitor usage.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-📈 Include Sync/Usage Stats Dashboard: Provide insights into document synchronization and chatbot activity.
+## Roadmap
 
-🗂️ Allow Syncing from Other Sources: Expand document ingestion to Dropbox, OneDrive, and more.
+- [ ] Multi-user authentication and authorization
+- [ ] Support for additional cloud storage providers (Dropbox, OneDrive)
+- [ ] Advanced analytics and usage dashboard
+- [ ] Chat history export functionality
+- [ ] Enhanced document preprocessing with OCR support
+- [ ] API rate limiting and usage monitoring
 
-🧾 PDF Export for Chat History: Enable users to download their conversation history.
+## License
 
-🧑‍💻 Author
-Made with ❤️ by Selcii, powered by curiosity and way too much caffeine.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-If you find this project useful, please consider giving it a ⭐ on GitHub and sharing your builds!
+## Support
 
-📝 License
-This project is licensed under the MIT License.
+- **Live Demo**: [https://intellirag-gdrive-bot16.onrender.com](https://intellirag-gdrive-bot16.onrender.com)
+- **Issues**: Please report bugs and feature requests via GitHub Issues
+- **Documentation**: Comprehensive docs available in the `/docs` directory
 
-Feel free to use, modify, and deploy — just remember to give credit where it’s due.
+---
 
+**Built with ❤️ by the IntelliRAG Team**
+
+*If you find this project useful, please consider starring the repository and sharing it with others!*
