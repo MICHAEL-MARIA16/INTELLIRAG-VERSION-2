@@ -68,8 +68,7 @@ IntelliRAG transforms how you interact with your document collections by providi
 
 ```bash
 # Clone the repository
-git clone https://github.com/MICHAEL-MARIA16/INTELLIRAG-GDRIVE_BOT.git
-cd intellirag
+
 
 # Create virtual environment
 python -m venv venv
