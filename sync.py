@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 import signal
 import sys
 import platform
+from supabase_utils import insert_raw_file, insert_processed_chunks
 
 
 # Optional LangChain imports
@@ -84,6 +85,22 @@ class DriveQdrantSync:
                 return False
             logger.info("STEP 2: ✓ Qdrant collection ready")
             
+            # Debug Supabase connection during initialization
+            logger.info("STEP 2.5: Testing Supabase connection...")
+            try:
+                from supabase_utils import test_connection, get_table_counts
+                if test_connection():
+                    logger.info("STEP 2.5: ✓ Supabase connection OK")
+                    get_table_counts()
+                else:
+                    logger.error("STEP 2.5: ✗ Supabase connection FAILED")
+                    return False
+            except Exception as e:
+                logger.error(f"STEP 2.5: ✗ Supabase test failed: {e}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                return False
+            
             logger.info("STEP 3: Loading sync configuration...")
             # Load last sync time from config file
             self.load_sync_config()
@@ -128,6 +145,22 @@ class DriveQdrantSync:
             try:
                 logger.info("🚀 STARTING FULL SYNCHRONIZATION...")
 
+                # Debug Supabase connection at start of sync
+                logger.info("🔍 DEBUGGING: Testing Supabase connection from sync...")
+                try:
+                    from supabase_utils import test_connection, get_table_counts
+                    if test_connection():
+                        logger.info("🔍 DEBUGGING: ✓ Supabase connection OK from sync")
+                        get_table_counts()
+                    else:
+                        logger.error("🔍 DEBUGGING: ✗ Supabase connection FAILED from sync")
+                        return False
+                except Exception as e:
+                    logger.error(f"🔍 DEBUGGING: ✗ Supabase test failed: {e}")
+                    import traceback
+                    logger.error(f"Full traceback: {traceback.format_exc()}")
+                    return False
+
                 # Setup timeout using signal only on non-Windows
                 if not IS_WINDOWS:
                     signal.signal(signal.SIGALRM, timeout_handler)
@@ -153,8 +186,9 @@ class DriveQdrantSync:
                 
                 
                 original_count = len(drive_files)
-                #drive_files = drive_files[:2]
-                logger.info(f" Processing all {original_count} files from Google Drive")
+                # DEBUGGING: Process only first file for testing
+                #drive_files = drive_files[:1]  # Uncomment this line for testing with just one file
+                logger.info(f" Processing {len(drive_files)} of {original_count} files from Google Drive (DEBUGGING MODE)")
                 
                 drive_file_ids = {file['id'] for file in drive_files}
                 
@@ -247,6 +281,29 @@ class DriveQdrantSync:
                         
                         logger.info(f"  Step 2: ✓ Extracted {len(text):,} characters in {extract_time:.2f}s")
                         
+                        # Enhanced Supabase debugging for raw file
+                        logger.info(f"  Step 2.5: 🔍 DEBUGGING Supabase insert for {file_info['name']}")
+                        logger.info(f"  Step 2.5: File ID: {file_info['id']}")
+                        logger.info(f"  Step 2.5: File name: {file_info['name']}")
+                        logger.info(f"  Step 2.5: Text length: {len(text)}")
+
+                        try:
+                            logger.info(f"  Step 2.5: Calling insert_raw_file...")
+                            supabase_file_id = insert_raw_file(file_info['id'], file_info['name'], text)
+                            logger.info(f"  Step 2.5: insert_raw_file returned: {supabase_file_id}")
+                            
+                            if supabase_file_id:
+                                logger.info(f"  🟢 Supabase: raw file inserted successfully (ID: {supabase_file_id})")
+                            else:
+                                logger.error(f"  ❌ Supabase: insert_raw_file returned None/False")
+                                
+                        except Exception as e:
+                            logger.error(f"  ❌ Supabase raw insert EXCEPTION: {e}")
+                            logger.error(f"  ❌ Exception type: {type(e).__name__}")
+                            import traceback
+                            logger.error(f"  ❌ Full traceback: {traceback.format_exc()}")
+                            # Don't return False here, let the sync continue for debugging
+
                         # Create chunks
                         logger.info(f"  Step 3: Creating text chunks...")
                         chunk_start = time.time()
@@ -254,6 +311,28 @@ class DriveQdrantSync:
                         chunk_time = time.time() - chunk_start
                         logger.info(f"  Step 3: ✓ Created {len(chunks)} chunks in {chunk_time:.2f}s")
                         
+                        # Enhanced Supabase chunks debugging  
+                        logger.info(f"  Step 3.5: 🔍 DEBUGGING Supabase chunks insert for {file_info['name']}")
+                        logger.info(f"  Step 3.5: Number of chunks: {len(chunks)}")
+                        logger.info(f"  Step 3.5: Sample chunk (first 100 chars): {chunks[0][:100] if chunks else 'No chunks'}")
+
+                        try:
+                            logger.info(f"  Step 3.5: Calling insert_processed_chunks...")
+                            chunks_success = insert_processed_chunks(file_info['id'], file_info['name'], chunks)
+                            logger.info(f"  Step 3.5: insert_processed_chunks returned: {chunks_success}")
+                            
+                            if chunks_success:
+                                logger.info(f"  🟢 Supabase: {len(chunks)} chunks inserted successfully")
+                            else:
+                                logger.error(f"  ❌ Supabase: insert_processed_chunks returned False")
+                                
+                        except Exception as e:
+                            logger.error(f"  ❌ Supabase chunks insert EXCEPTION: {e}")
+                            logger.error(f"  ❌ Exception type: {type(e).__name__}")
+                            import traceback
+                            logger.error(f"  ❌ Full traceback: {traceback.format_exc()}")
+                            # Don't return False here, let the sync continue for debugging
+
                         # Generate embeddings - THIS IS THE LIKELY BOTTLENECK
                         logger.info(f"  Step 4: Generating embeddings for {len(chunks)} chunks...")
                         embed_start = time.time()
@@ -308,6 +387,14 @@ class DriveQdrantSync:
                         file_total_time = time.time() - file_start_time
                         logger.info(f"📄 ✅ COMPLETED {file_info['name']} in {file_total_time:.2f}s total")
                         
+                        # Check Supabase tables after processing this file
+                        logger.info(f"  Step 7: 🔍 DEBUGGING: Checking Supabase after processing {file_info['name']}")
+                        try:
+                            from supabase_utils import get_table_counts
+                            get_table_counts()
+                        except Exception as e:
+                            logger.error(f"  ❌ Failed to check Supabase tables: {e}")
+                        
                     except Exception as e:
                         logger.error(f"📄 ❌ ERROR processing {file_info['name']}: {e}")
                         import traceback
@@ -330,6 +417,15 @@ class DriveQdrantSync:
                 logger.info(f"   • Documents added: {total_processed_docs}")
                 logger.info(f"   • Files deleted: {deleted_count}")
                 logger.info(f"   • Total docs in DB: {total_docs}")
+                
+                # Final Supabase check
+                logger.info("🔍 FINAL DEBUGGING: Final Supabase table counts")
+                try:
+                    from supabase_utils import get_table_counts, list_recent_files
+                    get_table_counts()
+                    list_recent_files()
+                except Exception as e:
+                    logger.error(f"❌ Final Supabase check failed: {e}")
                 
                 return True
                 
