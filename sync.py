@@ -13,8 +13,7 @@ from dotenv import load_dotenv
 import signal
 import sys
 import platform
-from supabase_utils import insert_raw_file, insert_processed_chunks
-
+from supabase_utils import insert_raw_file, insert_processed_chunks, get_existing_file_hashes, delete_file_by_drive_id, test_connection, get_table_counts
 
 # Optional LangChain imports
 try:
@@ -24,17 +23,12 @@ try:
 except ImportError:
     LANGCHAIN_AVAILABLE = False
 
-
 load_dotenv()  # this loads .env from the root by default
 
-
 from drive_loader import GoogleDriveLoader
-from qdrant_utils import QdrantManager
-
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
 
 IS_WINDOWS = platform.system() == "Windows"
 
@@ -43,19 +37,14 @@ def timeout_handler(signum, frame):
     logger.error("TIMEOUT: Operation took too long, forcing exit")
     sys.exit(1)
 
-
-class DriveQdrantSync:
+class DriveSupabaseSync:
     def __init__(
         self,
         folder_id: str,
-        qdrant_url: str,
-        qdrant_api_key: str,
-        collection_name: str,
         credentials_path: str = "credentials.json",
         use_langchain: bool = False
     ):
         self.drive_loader = GoogleDriveLoader(folder_id, credentials_path)
-        self.qdrant_manager = QdrantManager(qdrant_url, qdrant_api_key, collection_name, use_langchain)
         self.last_sync_time = None
         self.sync_lock = threading.Lock()
         self.config_file = "sync_config.json"
@@ -78,28 +67,12 @@ class DriveQdrantSync:
             self.drive_loader.authenticate()
             logger.info("STEP 1: ✓ Google Drive authentication successful")
             
-            logger.info("STEP 2: Creating/checking Qdrant collection...")
-            # Create Qdrant collection if needed
-            if not self.qdrant_manager.create_collection():
-                logger.error("STEP 2: ✗ Failed to create Qdrant collection")
+            logger.info("STEP 2: Testing Supabase connection...")
+            if not test_connection():
+                logger.error("STEP 2: ✗ Supabase connection FAILED")
                 return False
-            logger.info("STEP 2: ✓ Qdrant collection ready")
-            
-            # Debug Supabase connection during initialization
-            logger.info("STEP 2.5: Testing Supabase connection...")
-            try:
-                from supabase_utils import test_connection, get_table_counts
-                if test_connection():
-                    logger.info("STEP 2.5: ✓ Supabase connection OK")
-                    get_table_counts()
-                else:
-                    logger.error("STEP 2.5: ✗ Supabase connection FAILED")
-                    return False
-            except Exception as e:
-                logger.error(f"STEP 2.5: ✗ Supabase test failed: {e}")
-                import traceback
-                logger.error(f"Full traceback: {traceback.format_exc()}")
-                return False
+            logger.info("STEP 2: ✓ Supabase connection ready")
+            get_table_counts()
             
             logger.info("STEP 3: Loading sync configuration...")
             # Load last sync time from config file
@@ -145,22 +118,6 @@ class DriveQdrantSync:
             try:
                 logger.info("🚀 STARTING FULL SYNCHRONIZATION...")
 
-                # Debug Supabase connection at start of sync
-                logger.info("🔍 DEBUGGING: Testing Supabase connection from sync...")
-                try:
-                    from supabase_utils import test_connection, get_table_counts
-                    if test_connection():
-                        logger.info("🔍 DEBUGGING: ✓ Supabase connection OK from sync")
-                        get_table_counts()
-                    else:
-                        logger.error("🔍 DEBUGGING: ✗ Supabase connection FAILED from sync")
-                        return False
-                except Exception as e:
-                    logger.error(f"🔍 DEBUGGING: ✗ Supabase test failed: {e}")
-                    import traceback
-                    logger.error(f"Full traceback: {traceback.format_exc()}")
-                    return False
-
                 # Setup timeout using signal only on non-Windows
                 if not IS_WINDOWS:
                     signal.signal(signal.SIGALRM, timeout_handler)
@@ -184,12 +141,6 @@ class DriveQdrantSync:
                 if len(drive_files) > 5:
                     logger.info(f"  ... and {len(drive_files) - 5} more files")
                 
-                
-                original_count = len(drive_files)
-                # DEBUGGING: Process only first file for testing
-                #drive_files = drive_files[:1]  # Uncomment this line for testing with just one file
-                logger.info(f" Processing {len(drive_files)} of {original_count} files from Google Drive (DEBUGGING MODE)")
-                
                 drive_file_ids = {file['id'] for file in drive_files}
                 
                 logger.info("PHASE 2: Computing file hashes...")
@@ -208,10 +159,10 @@ class DriveQdrantSync:
                 
                 logger.info(f"PHASE 2: ✓ All hashes computed ({time.time() - start_time:.2f}s)")
                 
-                logger.info("PHASE 3: Fetching existing file hashes from Qdrant...")
+                logger.info("PHASE 3: Fetching existing file hashes from Supabase...")
                 start_time = time.time()
                 try:
-                    existing_hashes = self.qdrant_manager.get_all_file_hashes()
+                    existing_hashes = get_existing_file_hashes()
                     logger.info(f"PHASE 3: ✓ Retrieved {len(existing_hashes)} existing hashes ({time.time() - start_time:.2f}s)")
                 except Exception as e:
                     logger.error(f"PHASE 3: ✗ Error getting existing hashes: {e}")
@@ -242,11 +193,11 @@ class DriveQdrantSync:
                 # Delete removed files
                 deleted_count = 0
                 for file_id in files_to_delete:
-                    if self.qdrant_manager.delete_documents_by_file_id(file_id):
+                    if delete_file_by_drive_id(file_id):
                         deleted_count += 1
                 
                 if deleted_count > 0:
-                    logger.info(f"PHASE 4: ✓ Deleted {deleted_count} files from Qdrant")
+                    logger.info(f"PHASE 4: ✓ Deleted {deleted_count} files from Supabase")
                 
                 # Process new/updated files
                 if not files_to_process:
@@ -265,9 +216,9 @@ class DriveQdrantSync:
                     file_start_time = time.time()
                     
                     try:
-                        # Delete existing documents for this file first
-                        logger.info(f"  Step 1: Deleting existing documents for file...")
-                        self.qdrant_manager.delete_documents_by_file_id(file_info['id'])
+                        # Delete existing records for this file first
+                        logger.info(f"  Step 1: Deleting existing records for file...")
+                        delete_file_by_drive_id(file_info['id'])
                         
                         # Extract text
                         logger.info(f"  Step 2: Extracting text...")
@@ -281,119 +232,48 @@ class DriveQdrantSync:
                         
                         logger.info(f"  Step 2: ✓ Extracted {len(text):,} characters in {extract_time:.2f}s")
                         
-                        # Enhanced Supabase debugging for raw file
-                        logger.info(f"  Step 2.5: 🔍 DEBUGGING Supabase insert for {file_info['name']}")
-                        logger.info(f"  Step 2.5: File ID: {file_info['id']}")
-                        logger.info(f"  Step 2.5: File name: {file_info['name']}")
-                        logger.info(f"  Step 2.5: Text length: {len(text)}")
-
-                        try:
-                            logger.info(f"  Step 2.5: Calling insert_raw_file...")
-                            supabase_file_id = insert_raw_file(file_info['id'], file_info['name'], text)
-                            logger.info(f"  Step 2.5: insert_raw_file returned: {supabase_file_id}")
+                        # Insert raw file with hash
+                        logger.info(f"  Step 3: Inserting raw file into Supabase...")
+                        file_hash = drive_file_hashes[file_info['id']]
+                        supabase_file_id = insert_raw_file(
+                            file_info['id'], 
+                            file_info['name'], 
+                            text,
+                            file_hash,
+                            file_info.get('mimeType'),
+                            file_info.get('size')
+                        )
+                        
+                        if not supabase_file_id:
+                            logger.error(f"  ❌ Failed to insert raw file")
+                            continue
                             
-                            if supabase_file_id:
-                                logger.info(f"  🟢 Supabase: raw file inserted successfully (ID: {supabase_file_id})")
-                            else:
-                                logger.error(f"  ❌ Supabase: insert_raw_file returned None/False")
-                                
-                        except Exception as e:
-                            logger.error(f"  ❌ Supabase raw insert EXCEPTION: {e}")
-                            logger.error(f"  ❌ Exception type: {type(e).__name__}")
-                            import traceback
-                            logger.error(f"  ❌ Full traceback: {traceback.format_exc()}")
-                            # Don't return False here, let the sync continue for debugging
-
+                        logger.info(f"  Step 3: ✓ Raw file inserted (ID: {supabase_file_id})")
+                        
                         # Create chunks
-                        logger.info(f"  Step 3: Creating text chunks...")
+                        logger.info(f"  Step 4: Creating text chunks...")
                         chunk_start = time.time()
                         chunks = self.chunk_text_langchain(text)
                         chunk_time = time.time() - chunk_start
-                        logger.info(f"  Step 3: ✓ Created {len(chunks)} chunks in {chunk_time:.2f}s")
+                        logger.info(f"  Step 4: ✓ Created {len(chunks)} chunks in {chunk_time:.2f}s")
                         
-                        # Enhanced Supabase chunks debugging  
-                        logger.info(f"  Step 3.5: 🔍 DEBUGGING Supabase chunks insert for {file_info['name']}")
-                        logger.info(f"  Step 3.5: Number of chunks: {len(chunks)}")
-                        logger.info(f"  Step 3.5: Sample chunk (first 100 chars): {chunks[0][:100] if chunks else 'No chunks'}")
-
-                        try:
-                            logger.info(f"  Step 3.5: Calling insert_processed_chunks...")
-                            chunks_success = insert_processed_chunks(file_info['id'], file_info['name'], chunks)
-                            logger.info(f"  Step 3.5: insert_processed_chunks returned: {chunks_success}")
+                        # Insert chunks
+                        logger.info(f"  Step 5: Inserting chunks into Supabase...")
+                        chunks_success = insert_processed_chunks(
+                            file_info['id'], 
+                            file_info['name'], 
+                            chunks
+                        )
+                        
+                        if not chunks_success:
+                            logger.error(f"  ❌ Failed to insert chunks")
+                            continue
                             
-                            if chunks_success:
-                                logger.info(f"  🟢 Supabase: {len(chunks)} chunks inserted successfully")
-                            else:
-                                logger.error(f"  ❌ Supabase: insert_processed_chunks returned False")
-                                
-                        except Exception as e:
-                            logger.error(f"  ❌ Supabase chunks insert EXCEPTION: {e}")
-                            logger.error(f"  ❌ Exception type: {type(e).__name__}")
-                            import traceback
-                            logger.error(f"  ❌ Full traceback: {traceback.format_exc()}")
-                            # Don't return False here, let the sync continue for debugging
-
-                        # Generate embeddings - THIS IS THE LIKELY BOTTLENECK
-                        logger.info(f"  Step 4: Generating embeddings for {len(chunks)} chunks...")
-                        embed_start = time.time()
-                        
-                        try:
-                            embeddings = self.drive_loader.generate_embeddings(chunks)
-                            embed_time = time.time() - embed_start
-                            logger.info(f"  Step 4: ✓ Generated embeddings in {embed_time:.2f}s ({embed_time/len(chunks):.3f}s per chunk)")
-                        except Exception as e:
-                            logger.error(f"  Step 4: ✗ Failed to generate embeddings: {e}")
-                            continue
-                        
-                        # Create documents
-                        logger.info(f"  Step 5: Creating document objects...")
-                        file_hash = drive_file_hashes[file_info['id']]
-                        processed_documents = []
-                        
-                        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                            doc = {
-                                'id': f"{file_info['id']}_{i}",
-                                'file_id': file_info['id'],
-                                'file_name': file_info['name'],
-                                'file_hash': file_hash,
-                                'chunk_index': i,
-                                'text': chunk,
-                                'embedding': embedding,
-                                'metadata': {
-                                    'file_name': file_info['name'],
-                                    'mime_type': file_info['mimeType'],
-                                    'modified_time': file_info.get('modifiedTime'),
-                                    'file_size': file_info.get('size'),
-                                    'chunk_index': i,
-                                    'total_chunks': len(chunks)
-                                }
-                            }
-                            processed_documents.append(doc)
-                        
-                        logger.info(f"  Step 5: ✓ Created {len(processed_documents)} document objects")
-                        
-                        # Upsert to Qdrant
-                        logger.info(f"  Step 6: Upserting documents to Qdrant...")
-                        upsert_start = time.time()
-                        
-                        if self.qdrant_manager.upsert_documents(processed_documents):
-                            upsert_time = time.time() - upsert_start
-                            logger.info(f"  Step 6: ✓ Upserted {len(processed_documents)} documents in {upsert_time:.2f}s")
-                            total_processed_docs += len(processed_documents)
-                        else:
-                            logger.error(f"  Step 6: ✗ Failed to upsert documents")
-                            continue
+                        logger.info(f"  Step 5: ✓ {len(chunks)} chunks inserted successfully")
+                        total_processed_docs += len(chunks)
                         
                         file_total_time = time.time() - file_start_time
                         logger.info(f"📄 ✅ COMPLETED {file_info['name']} in {file_total_time:.2f}s total")
-                        
-                        # Check Supabase tables after processing this file
-                        logger.info(f"  Step 7: 🔍 DEBUGGING: Checking Supabase after processing {file_info['name']}")
-                        try:
-                            from supabase_utils import get_table_counts
-                            get_table_counts()
-                        except Exception as e:
-                            logger.error(f"  ❌ Failed to check Supabase tables: {e}")
                         
                     except Exception as e:
                         logger.error(f"📄 ❌ ERROR processing {file_info['name']}: {e}")
@@ -410,22 +290,15 @@ class DriveQdrantSync:
                 self.save_sync_config()
                 
                 # Final summary
-                total_docs = self.qdrant_manager.count_documents()
                 logger.info(f"🎉 FULL SYNC COMPLETED SUCCESSFULLY!")
                 logger.info(f"   📊 Statistics:")
                 logger.info(f"   • Files processed: {len(files_to_process)}")
                 logger.info(f"   • Documents added: {total_processed_docs}")
                 logger.info(f"   • Files deleted: {deleted_count}")
-                logger.info(f"   • Total docs in DB: {total_docs}")
                 
                 # Final Supabase check
-                logger.info("🔍 FINAL DEBUGGING: Final Supabase table counts")
-                try:
-                    from supabase_utils import get_table_counts, list_recent_files
-                    get_table_counts()
-                    list_recent_files()
-                except Exception as e:
-                    logger.error(f"❌ Final Supabase check failed: {e}")
+                logger.info("🔍 FINAL: Final Supabase table counts")
+                get_table_counts()
                 
                 return True
                 
@@ -437,7 +310,6 @@ class DriveQdrantSync:
                 logger.error(f"Full traceback: {traceback.format_exc()}")
                 return False
 
-
     def chunk_text_langchain(self, text: str) -> List[str]:
         """Use LangChain's text splitter for chunking"""
         if self.use_langchain and hasattr(self, 'text_splitter'):
@@ -445,7 +317,6 @@ class DriveQdrantSync:
         else:
             # Fallback to drive_loader's chunking method
             return self.drive_loader.chunk_text(text)
-
 
     def perform_incremental_sync(self) -> bool:
         """Perform incremental sync based on modification time"""
@@ -457,23 +328,13 @@ class DriveQdrantSync:
         logger.info("Redirecting to full sync for debugging...")
         return self.perform_full_sync()
 
-
 def main():
-    parser = argparse.ArgumentParser(description="Google Drive to Qdrant Sync Tool")
+    parser = argparse.ArgumentParser(description="Google Drive to Supabase Sync Tool")
     
     # Make arguments optional and use environment variables as defaults
     parser.add_argument("--folder-id", 
                        default=os.getenv("GOOGLE_DRIVE_FOLDER_ID"), 
                        help="Google Drive folder ID (default: from GOOGLE_DRIVE_FOLDER_ID env var)")
-    parser.add_argument("--qdrant-url", 
-                       default=os.getenv("QDRANT_URL"), 
-                       help="Qdrant URL (default: from QDRANT_URL env var)")
-    parser.add_argument("--qdrant-api-key", 
-                       default=os.getenv("QDRANT_API_KEY"), 
-                       help="Qdrant API key (default: from QDRANT_API_KEY env var)")
-    parser.add_argument("--collection-name", 
-                       default=os.getenv("QDRANT_COLLECTION"), 
-                       help="Qdrant collection name (default: from QDRANT_COLLECTION env var)")
     parser.add_argument("--credentials-path", 
                        default="credentials.json", 
                        help="Path to Google credentials JSON")
@@ -483,23 +344,13 @@ def main():
                        help="Sync mode")
     parser.add_argument("--use-langchain", 
                        action="store_true", 
-                       help="Enable LangChain text splitting and search features")
+                       help="Enable LangChain text splitting features")
     
     args = parser.parse_args()
     
     # Validate required arguments
-    missing_args = []
     if not args.folder_id:
-        missing_args.append("folder-id (or GOOGLE_DRIVE_FOLDER_ID env var)")
-    if not args.qdrant_url:
-        missing_args.append("qdrant-url (or QDRANT_URL env var)")
-    if not args.qdrant_api_key:
-        missing_args.append("qdrant-api-key (or QDRANT_API_KEY env var)")
-    if not args.collection_name:
-        missing_args.append("collection-name (or QDRANT_COLLECTION env var)")
-    
-    if missing_args:
-        logger.error(f"Missing required arguments: {', '.join(missing_args)}")
+        logger.error("Missing required argument: folder-id (or GOOGLE_DRIVE_FOLDER_ID env var)")
         return 1
     
     # Check if LangChain is requested but not available
@@ -510,17 +361,12 @@ def main():
     # Display configuration
     logger.info(f"🔧 Configuration:")
     logger.info(f"   Folder ID: {args.folder_id}")
-    logger.info(f"   Qdrant URL: {args.qdrant_url}")
-    logger.info(f"   Collection: {args.collection_name}")
     logger.info(f"   Mode: {args.mode}")
     logger.info(f"   LangChain: {args.use_langchain and LANGCHAIN_AVAILABLE}")
     
     # Initialize sync manager
-    sync_manager = DriveQdrantSync(
+    sync_manager = DriveSupabaseSync(
         folder_id=args.folder_id,
-        qdrant_url=args.qdrant_url,
-        qdrant_api_key=args.qdrant_api_key,
-        collection_name=args.collection_name,
         credentials_path=args.credentials_path,
         use_langchain=args.use_langchain
     )
@@ -542,7 +388,6 @@ def main():
             return 1
     
     return 0
-
 
 if __name__ == "__main__":
     exit(main())
